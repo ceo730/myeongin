@@ -471,24 +471,18 @@ const CONFIG_STORE_KEY="myeongin_admin_config";
 const CONFIG_DEFAULT_KEY="myeongin_admin_config_default";
 const SYSPROMPT_DEFAULT_KEY="myeongin_system_prompt_default";
 
-// localStorage 네임스페이스 마이그레이션:
-// 같은 origin(ceo730.github.io)의 saju 프로젝트와 키가 충돌하던 것을 분리.
-// 기존 saju_* 데이터를 myeongin_* 로 옮기고 saju_* 는 삭제하여 saju 페이지 오염 해소.
-(function migrateLegacyKeys(){
+// localStorage 네임스페이스 분리:
+// 같은 origin(ceo730.github.io)에 있는 saju 프로젝트와 키가 충돌하지 않도록
+// myeongin은 자체 myeongin_* 네임스페이스를 사용한다.
+// 단, API 키만은 saju_openai_apikey가 있으면 한 번 복사하여 사용자 편의 제공.
+// saju 프로젝트의 다른 데이터(config, users, system prompt)는 스키마가 다르므로 절대 건드리지 않음.
+(function copyApiKeyOnly(){
   try{
-    const pairs=[
-      ["saju_openai_apikey",APIKEY_STORE_KEY],
-      ["saju_admin_config",CONFIG_STORE_KEY],
-      ["saju_admin_config_default",CONFIG_DEFAULT_KEY],
-      [SYSPROMPT_DEFAULT_KEY,SYSPROMPT_DEFAULT_KEY]
-    ];
-    for(const[oldK,newK]of pairs){
-      const oldV=localStorage.getItem(oldK);
-      if(oldV==null)continue;
-      if(localStorage.getItem(newK)==null)localStorage.setItem(newK,oldV);
-      localStorage.removeItem(oldK);
+    const legacyKey=localStorage.getItem("saju_openai_apikey");
+    if(legacyKey&&!localStorage.getItem(APIKEY_STORE_KEY)){
+      localStorage.setItem(APIKEY_STORE_KEY,legacyKey);
     }
-  }catch(e){console.warn("localStorage 마이그레이션 실패:",e);}
+  }catch(e){console.warn("API 키 복사 실패:",e);}
 })();
 const IMG_STORE_PREFIX="saju_img_";
 
