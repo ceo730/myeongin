@@ -922,14 +922,43 @@ async function callGPT(apiKey,saju,form,sectionTitle,subTitle,targetChars,isQues
   }else{
     userMsg=`다음 사주 정보를 기반으로 보고서의 한 소주제를 작성해주세요.\n\n${ctx}\n\n【섹션】${sectionTitle}\n【섹션 지시】${secPrompt||""}\n【소주제】${subTitle}\n【소주제 지시】${subPrompt||""}\n\n정확히 ${targetChars}자 내외(±50자)의 줄글 한 문단으로 작성하세요. 위의 섹션 지시와 소주제 지시를 충실히 반영하여 작성하세요. 이 소주제의 핵심만 집중하여 작성하고, 다른 소주제 영역은 언급하지 마세요.`;
   }
-  const res=await fetch("https://api.openai.com/v1/chat/completions",{
-    method:"POST",
-    headers:{"Content-Type":"application/json","Authorization":"Bearer "+apiKey},
-    body:JSON.stringify({model:"gpt-5.2",messages:[{role:"system",content:sysMsg},{role:"user",content:userMsg}],max_completion_tokens:1200,temperature:0.75})
-  });
-  if(!res.ok){const err=await res.json().catch(()=>({}));throw new Error(err.error?.message||"API 오류 "+res.status);}
-  const data=await res.json();
-  return(data.choices?.[0]?.message?.content||"").trim();
+  const RETRYABLE=new Set([408,425,429,500,502,503,504]);
+  const MAX_ATTEMPTS=4;
+  let lastErr;
+  for(let attempt=1;attempt<=MAX_ATTEMPTS;attempt++){
+    try{
+      const res=await fetch("https://api.openai.com/v1/chat/completions",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":"Bearer "+apiKey},
+        body:JSON.stringify({model:"gpt-5.2",messages:[{role:"system",content:sysMsg},{role:"user",content:userMsg}],max_completion_tokens:1200,temperature:0.75})
+      });
+      if(!res.ok){
+        const err=await res.json().catch(()=>({}));
+        const msg=err.error?.message||"API 오류 "+res.status;
+        if(RETRYABLE.has(res.status)&&attempt<MAX_ATTEMPTS){
+          const ra=parseFloat(res.headers.get("retry-after"))||0;
+          const wait=Math.max(ra*1000,Math.min(20000,1000*Math.pow(2,attempt-1)+Math.random()*500));
+          console.warn(`GPT ${res.status} 재시도 ${attempt}/${MAX_ATTEMPTS-1} (${Math.round(wait)}ms): ${msg}`);
+          await new Promise(r=>setTimeout(r,wait));
+          continue;
+        }
+        throw new Error(msg);
+      }
+      const data=await res.json();
+      return(data.choices?.[0]?.message?.content||"").trim();
+    }catch(e){
+      lastErr=e;
+      const isNet=e.name==="TypeError"||/fetch|network|Failed to fetch/i.test(e.message||"");
+      if(isNet&&attempt<MAX_ATTEMPTS){
+        const wait=Math.min(15000,1000*Math.pow(2,attempt-1)+Math.random()*500);
+        console.warn(`GPT 네트워크 재시도 ${attempt}/${MAX_ATTEMPTS-1} (${Math.round(wait)}ms): ${e.message}`);
+        await new Promise(r=>setTimeout(r,wait));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr||new Error("GPT 호출 실패");
 }
 
 function Admin({currentUser,onLogout}){
@@ -1092,6 +1121,7 @@ function Admin({currentUser,onLogout}){
     let failCount=0;
 
     for(let idx=0;idx<allSubs.length;idx++){
+      if(idx>0)await new Promise(r=>setTimeout(r,250));
       const{si,ti,secKey,subKey,secTitle,subTitle,targetChars,secPrompt,subPrompt}=allSubs[idx];
       let text="";let status="success";
         try{
