@@ -466,9 +466,30 @@ const SESSION_KEY="saju_admin_session";
 /*SHARED_APIKEY_START*/const SHARED_APIKEY="";/*SHARED_APIKEY_END*/
 /*SHARED_CONFIG_START*/const SHARED_CONFIG=null;/*SHARED_CONFIG_END*/
 
-const APIKEY_STORE_KEY="saju_openai_apikey";
-const CONFIG_STORE_KEY="saju_admin_config";
-const CONFIG_DEFAULT_KEY="saju_admin_config_default";
+const APIKEY_STORE_KEY="myeongin_openai_apikey";
+const CONFIG_STORE_KEY="myeongin_admin_config";
+const CONFIG_DEFAULT_KEY="myeongin_admin_config_default";
+const SYSPROMPT_DEFAULT_KEY="myeongin_system_prompt_default";
+
+// localStorage 네임스페이스 마이그레이션:
+// 같은 origin(ceo730.github.io)의 saju 프로젝트와 키가 충돌하던 것을 분리.
+// 기존 saju_* 데이터를 myeongin_* 로 옮기고 saju_* 는 삭제하여 saju 페이지 오염 해소.
+(function migrateLegacyKeys(){
+  try{
+    const pairs=[
+      ["saju_openai_apikey",APIKEY_STORE_KEY],
+      ["saju_admin_config",CONFIG_STORE_KEY],
+      ["saju_admin_config_default",CONFIG_DEFAULT_KEY],
+      [SYSPROMPT_DEFAULT_KEY,SYSPROMPT_DEFAULT_KEY]
+    ];
+    for(const[oldK,newK]of pairs){
+      const oldV=localStorage.getItem(oldK);
+      if(oldV==null)continue;
+      if(localStorage.getItem(newK)==null)localStorage.setItem(newK,oldV);
+      localStorage.removeItem(oldK);
+    }
+  }catch(e){console.warn("localStorage 마이그레이션 실패:",e);}
+})();
 const IMG_STORE_PREFIX="saju_img_";
 
 // 이미지 가져오기: localStorage 우선, 없으면 하드코딩 기본값
@@ -1312,8 +1333,8 @@ function Admin({currentUser,onLogout}){
             </div>
             <textarea value={config.systemPrompt||DEFAULT_GPT_SYSTEM} onChange={e=>setConfig(prev=>({...prev,systemPrompt:e.target.value}))} style={{width:"100%",minHeight:160,padding:"12px 14px",border:`1px solid ${C.border}`,borderRadius:10,fontSize:12,fontFamily:"inherit",background:"#faf8f5",outline:"none",lineHeight:"1.8",resize:"vertical",boxSizing:"border-box"}} placeholder="GPT 시스템 프롬프트를 입력하세요..."/>
             <div style={{display:"flex",gap:8,marginTop:6,flexWrap:"wrap"}}>
-              <button onClick={()=>{if(confirm("현재 시스템 프롬프트를 기본값으로 저장하시겠습니까?")){try{const cur=config.systemPrompt||DEFAULT_GPT_SYSTEM;localStorage.setItem("saju_system_prompt_default",cur);alert("✅ 시스템 프롬프트 기본값이 저장되었습니다.");}catch(e){alert("저장 실패")}}}} style={{padding:"6px 14px",border:`1px solid ${C.primary}`,background:`${C.primary}15`,color:C.primary,borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:600,fontFamily:"inherit"}}>💾 현재 프롬프트를 기본값으로 저장</button>
-              <button onClick={()=>{if(confirm("시스템 프롬프트를 기본값으로 되돌리시겠습니까?")){const saved=localStorage.getItem("saju_system_prompt_default");setConfig(prev=>({...prev,systemPrompt:saved||DEFAULT_GPT_SYSTEM}));}}} style={{padding:"6px 14px",border:`1px solid ${C.border}`,background:C.bg,color:C.light,borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:600,fontFamily:"inherit"}}>↺ 기본 프롬프트로 복원</button>
+              <button onClick={()=>{if(confirm("현재 시스템 프롬프트를 기본값으로 저장하시겠습니까?")){try{const cur=config.systemPrompt||DEFAULT_GPT_SYSTEM;localStorage.setItem(SYSPROMPT_DEFAULT_KEY,cur);alert("✅ 시스템 프롬프트 기본값이 저장되었습니다.");}catch(e){alert("저장 실패")}}}} style={{padding:"6px 14px",border:`1px solid ${C.primary}`,background:`${C.primary}15`,color:C.primary,borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:600,fontFamily:"inherit"}}>💾 현재 프롬프트를 기본값으로 저장</button>
+              <button onClick={()=>{if(confirm("시스템 프롬프트를 기본값으로 되돌리시겠습니까?")){const saved=localStorage.getItem(SYSPROMPT_DEFAULT_KEY);setConfig(prev=>({...prev,systemPrompt:saved||DEFAULT_GPT_SYSTEM}));}}} style={{padding:"6px 14px",border:`1px solid ${C.border}`,background:C.bg,color:C.light,borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:600,fontFamily:"inherit"}}>↺ 기본 프롬프트로 복원</button>
             </div>
           </div>
 
